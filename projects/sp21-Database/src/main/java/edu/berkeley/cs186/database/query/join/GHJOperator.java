@@ -12,6 +12,8 @@ import edu.berkeley.cs186.database.query.disk.SmartPartition;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
 
+import javax.xml.crypto.Data;
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class GHJOperator extends JoinOperator {
@@ -83,7 +85,15 @@ public class GHJOperator extends JoinOperator {
         // starting point. Make sure to use the hash function we provide to you
         // by calling hashFunc.apply(databox) to get an integer valued hash code
         // from a DataBox object.
-        return;
+        for (Record record : records) {
+            DataBox columnValue = left ? record.getValue(getLeftColumnIndex()) : record.getValue(getRightColumnIndex());
+            int hash = HashFunc.hashDataBox(columnValue, pass);
+            int partitionNum = hash % partitions.length;
+            if (partitionNum < 0) {
+                partitionNum = partitionNum + partitions.length;
+            }
+            partitions[partitionNum].add(record);
+        }
     }
 
     /**
@@ -124,6 +134,26 @@ public class GHJOperator extends JoinOperator {
         // You shouldn't refer to any variable starting with "left" or "right"
         // here, use the "build" and "probe" variables we set up for you.
         // Check out how SHJOperator implements this function if you feel stuck.
+        Map<DataBox, List<Record>> hashTable = new HashMap<>();
+        for (Record buildRecord : buildRecords) {
+            DataBox buildJoinValue = buildRecord.getValue(buildColumnIndex);
+            if (!hashTable.containsKey(buildJoinValue)) {
+                hashTable.put(buildJoinValue, new ArrayList<>());
+            }
+            hashTable.get(buildJoinValue).add(buildRecord);
+        }
+
+        //Probe stage
+        for (Record probeRecord : probeRecords) {
+            DataBox probeJoinValue = probeRecord.getValue(probeColumnIndex);
+            if (!hashTable.containsKey(probeJoinValue)) {
+                continue;
+            }
+            for (Record lRecord : hashTable.get(probeJoinValue)) {
+                Record joinedRecord = lRecord.concat(probeRecord);
+                this.joinedRecords.add(joinedRecord);
+            }
+        }
     }
 
     /**
@@ -150,6 +180,13 @@ public class GHJOperator extends JoinOperator {
             // do so immediately. If you don't meet the conditions and can't
             // further divide the partitions, find an alternative way to join
             // them together. Otherwise you should make a recursive call.
+            if ((leftPartitions[i].getNumPages() <= this.numBuffers - 2) || (rightPartitions[i].getNumPages() <= this.numBuffers - 2)) {
+                buildAndProbe(leftPartitions[i], rightPartitions[i]);
+            } else if (pass < 5) {
+                run(leftPartitions[i], rightPartitions[i], pass + 1);
+            } else {
+                throw new IllegalStateException("Reached the max number of passes");
+            }
         }
     }
 
@@ -222,6 +259,15 @@ public class GHJOperator extends JoinOperator {
 
         // TODO(proj3_part1): populate leftRecords and rightRecords such that
         // SHJ breaks when trying to join them but not GHJ
+        for (int i = 0; i < 48; ++i) {
+            Record leftRecord = createRecord(0);
+            leftRecords.add(leftRecord);
+        }
+        for (int i = 0; i < 48; ++i) {
+            Record rightRecord = createRecord(i);
+            rightRecords.add(rightRecord);
+        }
+
         return new Pair<>(leftRecords, rightRecords);
     }
 
@@ -243,6 +289,12 @@ public class GHJOperator extends JoinOperator {
         ArrayList<Record> rightRecords = new ArrayList<>();
         // TODO(proj3_part1): populate leftRecords and rightRecords such that GHJ breaks
 
+        for (int i = 0; i < 48; ++i) {
+            Record leftRecord = createRecord(0);
+            Record rightRecord = createRecord(0);
+            leftRecords.add(leftRecord);
+            rightRecords.add(rightRecord);
+        }
         return new Pair<>(leftRecords, rightRecords);
     }
 }
