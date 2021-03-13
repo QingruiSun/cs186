@@ -93,8 +93,7 @@ public class SortOperator extends QueryOperator {
             recordList.add(records.next());
         }
         Collections.sort(recordList, this.comparator);
-        Run run = new Run(this.transaction, getSchema());
-        run.addAll(recordList);
+        Run run = makeRun(recordList);
         return run;
     }
 
