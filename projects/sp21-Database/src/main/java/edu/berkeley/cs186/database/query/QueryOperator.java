@@ -184,7 +184,6 @@ public abstract class QueryOperator implements Iterable<Record> {
                 String[] splits = fromSchema.split("\\.");
                 schemaColName = splits[1];
             }
-
             return schemaColName.equals(specified);
         }
         return false;
